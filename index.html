@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Faça sua denúncia agora</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: #f0f2f5;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 600px;
+            margin: auto;
+            background: #ffffff;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 20px;
+        }
+        label {
+            margin-top: 15px;
+            display: block;
+            color: #555;
+            font-weight: 600;
+        }
+        input[type="text"], input[type="file"], textarea, select {
+            width: 100%;
+            padding: 12px;
+            margin-top: 5px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        button {
+            background-color: #28a745;
+            color: white;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-top: 15px;
+            width: 100%;
+            font-weight: bold;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #218838;
+        }
+        #map {
+            width: 100%;
+            height: 300px;
+            border-radius: 8px;
+            margin-top: 10px;
+            display: none; /* Esconder o mapa inicialmente */
+        }
+        .hidden {
+            display: none;
+        }
+        .message {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 5px;
+            background-color: #d4edda;
+            color: #155724;
+            display: none;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+    </style>
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+</head>
+<body>
+
+<div class="container">
+    <h1>Faça sua Denúncia agora :</h1>
+    <form id="denunciaForm" enctype="multipart/form-data">
+        <label for="anonimo">Escolha uma Opção:</label>
+        <select id="opcaoIdentificacao" name="opcaoIdentificacao">
+            <option value="anonimo">Ser Anônimo</option>
+            <option value="identificado">Me Identificar</option>
+        </select>
+
+        <div id="identificacao" class="hidden">
+            <label for="nome">Nome:</label>
+            <input type="text" id="nome" name="nome">
+        </div>
+
+        <label for="enderecoOpcao">Opção de Endereço:</label>
+        <select id="enderecoOpcao" name="enderecoOpcao">
+            <option value="digitar">Digitar Endereço</option>
+            <option value="mapa">Marcar no Mapa</option>
+        </select>
+
+        <div id="enderecoManual">
+            <label for="endereco">Endereço:</label>
+            <input type="text" id="endereco" name="endereco">
+
+            <label for="bairro">Bairro:</label>
+            <input type="text" id="bairro" name="bairro">
+
+            <label for="numero">Número:</label>
+            <input type="text" id="numero" name="numero">
+
+            <label for="referencia">Referência (opcional):</label>
+            <input type="text" id="referencia" name="referencia">
+        </div>
+
+        <div id="map"></div>
+
+        <label for="descricao">Descrição (máx. 500 caracteres):</label>
+        <textarea id="descricao" name="descricao" rows="4" maxlength="500" required></textarea>
+
+        <label for="foto">Anexar Foto (opcional):</label>
+        <input type="file" id="foto" name="foto" accept="image/*">
+
+        <button type="submit">Enviar Denúncia</button>
+    </form>
+    <div id="message" class="message"></div>
+</div>
+
+<script>
+    let map, marker;
+
+    function initMap() {
+        map = L.map('map').setView([-3.73774, -40.9918], 15); // Centro de Tianguá
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '© OpenStreetMap'
+        }).addTo(map);
+
+        map.on('click', (event) => {
+            placeMarker(event.latlng);
+        });
+    }
+
+    function placeMarker(location) {
+        if (marker) {
+            map.removeLayer(marker);
+        }
+        marker = L.marker(location).addTo(map);
+        document.getElementById('endereco').value = `Lat: ${location.lat}, Lng: ${location.lng}`;
+    }
+
+    document.getElementById('opcaoIdentificacao').addEventListener('change', function() {
+        const identificacaoDiv = document.getElementById('identificacao');
+        identificacaoDiv.classList.toggle('hidden', this.value === 'anonimo');
+        if (this.value === 'anonimo') {
+            document.getElementById('nome').value = ''; // Limpar o campo de nome
+        }
+    });
+
+    document.getElementById('enderecoOpcao').addEventListener('change', function() {
+        const enderecoManual = document.getElementById('enderecoManual');
+        const mapDiv = document.getElementById('map');
+        if (this.value === 'digitar') {
+            enderecoManual.style.display = 'block';
+            mapDiv.style.display = 'none';
+            document.getElementById('endereco').value = ''; // Limpar campo de endereço
+            if (marker) {
+                map.removeLayer(marker); // Limpar marcador se estiver visível
+                marker = null;
+            }
+        } else {
+            enderecoManual.style.display = 'none';
+            mapDiv.style.display = 'block';
+            if (!map) {
+                initMap();
+            } else {
+                map.invalidateSize(); // Forçar o mapa a se ajustar corretamente
+            }
+        }
+    });
+
+    document.getElementById('denunciaForm').addEventListener('submit', function(event) {
+        event.preventDefault();
+
+        const descricao = document.getElementById('descricao').value;
+        const foto = document.getElementById('foto').files[0];
+        const anonimo = document.getElementById('opcaoIdentificacao').value === 'anonimo';
+
+        // Validação adicional de campos
+        if (!descricao) {
+            alert('Por favor, preencha a descrição.');
+            return;
+        }
+
+        // Lógica para envio da denúncia (API ou processamento de dados)
+
+        const messageDiv = document.getElementById('message');
+        messageDiv.classList.remove('error');
+        messageDiv.textContent = 'Denúncia enviada com sucesso!';
+        messageDiv.style.display = 'block';
+
+        // Adicionando alerta para notificar o envio
+        alert('Sua denúncia foi enviada com sucesso!');
+
+        // Limpar o formulário
+        document.getElementById('denunciaForm').reset();
+        if (marker) {
+            map.removeLayer(marker); // Limpar o marcador
+            marker = null;
+        }
+        document.getElementById('map').style.display = 'none'; // Esconder o mapa novamente
+        document.getElementById('enderecoManual').style.display = 'block'; // Mostrar campos de endereço
+    });
+</script>
+
+</body>
+</html>
